@@ -19,6 +19,7 @@ int bytesRead = socket.Receive(responseBuffer); // Receive packets from client
 var lines = Encoding.UTF8.GetString(responseBuffer).Split("\r\n"); // Split the package according to CRLF line break
 var line0 = lines[0].Split(" "); // Split the first line of the package by space 
 var (method, path, httpVer) = (line0[0], line0[1], line0[2]);
+var (host, userAgent, accept) = (lines[1], lines[2], lines[3]);
 var splittedPath = path.Split("/");
 Console.WriteLine("method: " + method + "\n" + "path: " + path + "\n" + "httpVer: " + httpVer); // Print the method, path and HTTP version
 foreach(var value in splittedPath)
@@ -28,14 +29,18 @@ foreach(var value in splittedPath)
 // CN2
 //if (path == "/echo")
 string response;
-if (path == "/")
+if (path == "/" && splittedPath.Length < 2)
 {
     response = $"{httpVer} 200 OK\r\n\r\n";
 }
-else
+else if (splittedPath.Length >= 2)
 {
     switch (splittedPath[1])
     {
+        case "user-agent":
+            response = $"{httpVer} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {userAgent.Length.ToString()}\r\n\r\n{userAgent}";
+            break;
+                    
         case "echo":
             response = $"{httpVer} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {splittedPath[2].Length.ToString()}\r\n\r\n{splittedPath[2]}\n";
             break;
@@ -43,6 +48,10 @@ else
             response = $"{httpVer} 404 Not Found\r\n\r\n";
             break;
     }
+}
+else
+{
+    response = $"{httpVer} 404 Not Found\r\n\r\n";
 }
 
 // Check if the request is a GET request and the path is "/"
