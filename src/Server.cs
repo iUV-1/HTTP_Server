@@ -2,9 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-// You can use print statements as follows for debugging, they'll be visible when running tests.
-Console.WriteLine("Logs from your program will appear here!");
-
 // Uncomment this block to pass the first stage
 TcpListener server = new TcpListener(IPAddress.Any, 4221);
 server.Start();
@@ -19,9 +16,28 @@ int bytesRead = socket.Receive(responseBuffer); // Receive packets from client
 var lines = Encoding.UTF8.GetString(responseBuffer).Split("\r\n"); // Split the package according to CRLF line break
 var line0 = lines[0].Split(" "); // Split the first line of the package by space 
 var (method, path, httpVer) = (line0[0], line0[1], line0[2]);
-var (host, userAgent, accept) = (lines[1].Split(":")[1], lines[2].Split(":")[1], lines[3].Split(":")[1]);
+
+string host = "", userAgent = "", accept = "";
+
+for (int i = 1; i < lines.Length; i++){
+    var header = lines[i].Split(":");
+    switch (header[0].ToLower()){
+        case "host":
+            host = header[1];
+            break;
+        case "user-agent":
+            userAgent = header[1];
+            break;
+        case "accept":
+            accept = header[1];
+            break;
+        default:
+            break;
+    }
+}
+
 var splittedPath = path.Split("/");
-Console.WriteLine("//Header");
+Console.WriteLine("//Status line");
 Console.WriteLine("method: " + method + "\n" + "path: " + path + "\n" + "httpVer: " + httpVer); // Print the method, path and HTTP version
 Console.WriteLine("//Splitted path");
 foreach(var value in splittedPath)
