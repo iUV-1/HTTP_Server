@@ -46,7 +46,7 @@ foreach(var value in splittedPath)
 }
 
 string response;
-if (path == "/" && splittedPath.Length < 2)
+if (path == "/")
 {
     response = $"{httpVer} 200 OK\r\n\r\n";
 }
