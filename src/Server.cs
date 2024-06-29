@@ -55,9 +55,16 @@ class Program
 
                 int bytesRead =
                     await stream.ReadAsync(responseBuffer, 0, BUFFER_SIZE); // Receive packets from client
-                Console.WriteLine("Response Buffer");
-                Console.WriteLine(Encoding.UTF8.GetString(responseBuffer));
-                var lines = Encoding.UTF8.GetString(responseBuffer)
+                
+                int i = responseBuffer.Length - 1;
+                while(responseBuffer[i] == 0)
+                    --i;
+                // now foo[i] is the last non-zero byte
+                byte[] strippedBuffer = new byte[i+1];
+                Array.Copy(responseBuffer, strippedBuffer, i+1);
+                /*Console.WriteLine("Response Buffer");
+                Console.WriteLine(Encoding.UTF8.GetString(responseBuffer));*/
+                var lines = Encoding.UTF8.GetString(strippedBuffer)
                     .Split("\r\n"); // Split the package according to CRLF line break
                 Console.WriteLine("Lines: ");
                 foreach (var line in lines)
@@ -79,6 +86,7 @@ class Program
                 }
                 
                 // Request body
+                // This will have null bytes because we didnt use all of the BUFFER_SIZE
                 string requestBody = lines[lines.Length - 1];
 
                 string host, userAgent;
