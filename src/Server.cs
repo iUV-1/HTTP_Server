@@ -169,6 +169,7 @@ class Program
 
                 if (content == "" && contentType == "" && contentLength == "")
                 {
+                    response += "\r\n";
                     // No headers needed
                     break;
                 }
