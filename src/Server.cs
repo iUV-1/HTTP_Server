@@ -1,11 +1,32 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.IO;
 
 class Program
 {
     static async Task Main(string[] args)
     {
+        string directory = string.Empty;
+        // Parse directory from environment 
+        for (int i = 0; i < args.Length; i++)
+        {
+            if ((args[i] == "-d" || args[i] == "--directory") && i + 1 < args.Length)
+            {
+                directory = args[i + 1];
+                break;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+        {
+            Console.WriteLine($"Main: Working with directory: {directory}");
+        }
+        else
+        {
+            Console.WriteLine("Main: Directory not specified, using the base folder");
+        }
+        
         TcpListener server = new TcpListener(IPAddress.Any, 4221);
         server.Start();
         while (true)
@@ -13,11 +34,11 @@ class Program
             var cilent = await server.AcceptTcpClientAsync();
             Console.WriteLine("Cilent connected");
             // discard the result of HandleCilentAsync
-            _ = HandleCilentAsync(cilent);
+            _ = HandleCilentAsync(cilent, directory);
         }
     }
 
-    static async Task HandleCilentAsync(TcpClient cilent)
+    static async Task HandleCilentAsync(TcpClient cilent, string directory)
     {
         try
         {
@@ -51,8 +72,9 @@ class Program
                     headers[header[0].ToLower()] = header[1];
                 }
 
-                string host = headers[HOST];
-                string userAgent = headers[USER_AGENT];
+                string host, userAgent;
+                headers.TryGetValue(HOST, out host);
+                headers.TryGetValue(USER_AGENT, out userAgent);
                 string accept = "";
 
                 // Split the path
@@ -80,7 +102,18 @@ class Program
                     switch (splittedPath[1])
                     {
                         case "files":
-                            break;
+                            try
+                            {
+                                content = await File.ReadAllTextAsync($"./{directory}/{splittedPath[2]}");
+                                contentType = "application/octet-stream";
+                                await RespondwithFilesAsync(httpVer, stream, content, contentType);
+                            }
+                            catch (IOException ex)
+                            {
+                                Console.WriteLine($"/files/ Readfile: {ex.Message}");
+                                await RespondAsync(404, httpVer, stream);
+                            }
+                            break;    
 
                         case "user-agent":
                             content = userAgent.Trim();
@@ -163,5 +196,23 @@ class Program
 
         Console.WriteLine("Response sent");
     }
-    //static async Task RespondwithFiles(string status, string contentType, )
+
+    // IMPORTANT: This function assume that the response is successful and will return a 200 response
+    // If it's an error, please use RespondAsync() instead.
+    static async Task RespondwithFilesAsync( string httpVer, NetworkStream stream,
+        string content, string contentType = "")
+    {
+        string response;
+        int contentLength = Encoding.UTF8.GetBytes(content).Length;
+        response = $"{httpVer} 200 OK\r\n"
+                    + $"Content-Type: {contentType}\r\n" +
+                    $"Content-Length: {contentLength}\r\n\r\n" +
+                    $"{content}";
+        
+        Console.WriteLine("//Response");
+        Console.WriteLine(response); // Print the response
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+        Console.WriteLine("Response sent");
+    }
 }
