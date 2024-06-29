@@ -8,7 +8,7 @@ class Program
     static async Task Main(string[] args)
     {
         string directory = string.Empty;
-        // Parse directory from environment 
+        // Parse directory from argument 
         for (int i = 0; i < args.Length; i++)
         {
             if ((args[i] == "-d" || args[i] == "--directory") && i + 1 < args.Length)
@@ -29,6 +29,7 @@ class Program
         
         TcpListener server = new TcpListener(IPAddress.Any, 4221);
         server.Start();
+        // Constantly waits for a new cilent 
         while (true)
         {
             var cilent = await server.AcceptTcpClientAsync();
@@ -55,15 +56,8 @@ class Program
 
                 int bytesRead =
                     await stream.ReadAsync(responseBuffer, 0, BUFFER_SIZE); // Receive packets from client
-                
-                int idx = responseBuffer.Length - 1;
-                while(responseBuffer[idx] == 0)
-                    --idx;
-                // now foo[i] is the last non-zero byte
-                byte[] strippedBuffer = new byte[idx+1];
-                Array.Copy(responseBuffer, strippedBuffer, idx+1);
-                /*Console.WriteLine("Response Buffer");
-                Console.WriteLine(Encoding.UTF8.GetString(responseBuffer));*/
+
+                byte[] strippedBuffer = StripBuffer(responseBuffer);
                 var lines = Encoding.UTF8.GetString(strippedBuffer)
                     .Split("\r\n"); // Split the package according to CRLF line break
                 Console.WriteLine("Lines: ");
@@ -77,7 +71,7 @@ class Program
                 var (method, path, httpVer) = (line0[0], line0[1], line0[2]);
 
                 // Headers
-                // Split the headers into appropriate variables. If that properties doesn't exist then it is the default value (empty string)
+                // Split the headers and put them in a dictionary.
                 // The last 2 lines are the request body. We don't need it for parsing the header
                 for (int i = 1; i < lines.Length - 2; i++)
                 {
@@ -85,28 +79,29 @@ class Program
                     headers[header[0].ToLower()] = header[1];
                 }
                 
-                // Request body
-                // This will have null bytes because we didnt use all of the BUFFER_SIZE
-                string requestBody = lines[lines.Length - 1];
-
-                string host, userAgent;
+                // Getting the value into appropriate vars
+                // If it doesn't exist then don't throw a fuzz, just leave it empty
+                // spoopy
+                string host, userAgent, accept;
                 headers.TryGetValue(HOST, out host);
                 headers.TryGetValue(USER_AGENT, out userAgent);
-                string accept = "";
+                headers.TryGetValue(ACCEPT, out accept);
+                
+                // Request body
+                string requestBody = lines[lines.Length - 1];
 
                 // Split the path
                 var splittedPath = path.Split("/");
                 // Debug logging
                 Console.WriteLine("//Status line");
                 Console.WriteLine("method: " + method + "\n" + "path: " + path + "\n" + "httpVer: " +
-                                  httpVer); // Print the method, path and HTTP version
+                                  httpVer); 
                 Console.WriteLine("//Splitted path");
                 foreach (var value in splittedPath)
                 {
                     Console.WriteLine(value);
                 }
-
-                string response;
+                
                 if (path == "/" && method == "GET")
                 {
                     // Check if the request is a GET request and the path is "/"
@@ -121,6 +116,7 @@ class Program
                         case "files":
                             string filename = splittedPath[2];
                             // Hacky hacky hack hack
+                            // POST: Writefile
                             if (method == "POST")
                             {
                                 try
@@ -138,6 +134,7 @@ class Program
                                 }
                                 break;
                             }
+                            // GET: Readfile
                             try
                             {
                                 content = await File.ReadAllTextAsync($"{directory}/{filename}");
@@ -166,18 +163,14 @@ class Program
                             contentLength = content.Length.ToString();
                             await RespondAsync(status: 200, httpVer: httpVer, stream,
                                 content, contentType, contentLength);
-                            response =
-                                $"{httpVer} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {splittedPath[2].Length.ToString()}\r\n\r\n{splittedPath[2]}\n";
                             break;
                         default:
-                            response = $"{httpVer} 404 Not Found\r\n\r\n";
                             await RespondAsync(status: 404, httpVer: httpVer, stream);
                             break;
                     }
                 }
                 else
                 {
-                    response = $"{httpVer} 404 Not Found\r\n\r\n";
                     await RespondAsync(status: 404, httpVer: httpVer, stream);
                 }
 
@@ -232,7 +225,7 @@ class Program
         }
         
         Console.WriteLine("//Response");
-        Console.WriteLine(response); // Print the response
+        Console.WriteLine(response); // Log the response
         await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
 
         Console.WriteLine("Response sent");
@@ -255,5 +248,16 @@ class Program
         await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
 
         Console.WriteLine("Response sent");
+    }
+
+    // Strip NULL bytes out of a byte array
+    static byte[] StripBuffer(byte[] buffer)
+    {
+        int i = buffer.Length - 1;
+        while(buffer[i] == 0)
+            --i;
+        byte[] strippedBuffer = new byte[i+1];
+        Array.Copy(buffer, strippedBuffer, i+1);
+        return strippedBuffer;
     }
 }
