@@ -104,7 +104,7 @@ class Program
                         case "files":
                             try
                             {
-                                content = await File.ReadAllTextAsync($"./{directory}/{splittedPath[2]}");
+                                content = await File.ReadAllTextAsync($"{directory}/{splittedPath[2]}");
                                 contentType = "application/octet-stream";
                                 await RespondwithFilesAsync(httpVer, stream, content, contentType);
                             }
