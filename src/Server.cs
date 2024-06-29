@@ -54,9 +54,16 @@ class Program
                 byte[] responseBuffer = new byte[BUFFER_SIZE];
 
                 int bytesRead =
-                    await stream.ReadAsync(responseBuffer, 0, responseBuffer.Length); // Receive packets from client
+                    await stream.ReadAsync(responseBuffer, 0, BUFFER_SIZE); // Receive packets from client
+                Console.WriteLine("Response Buffer");
+                Console.WriteLine(Encoding.UTF8.GetString(responseBuffer));
                 var lines = Encoding.UTF8.GetString(responseBuffer)
                     .Split("\r\n"); // Split the package according to CRLF line break
+                Console.WriteLine("Lines: ");
+                foreach (var line in lines)
+                {
+                    Console.WriteLine(line);
+                }
                 
                 // Status 
                 var line0 = lines[0].Split(" "); // Split the first line of the package by space 
@@ -64,13 +71,15 @@ class Program
 
                 // Headers
                 // Split the headers into appropriate variables. If that properties doesn't exist then it is the default value (empty string)
-                // lines.Length - 2 is a cheap hack because the last 2 lines of what I splitted is nonsense (One is an empty line and the other is a null line?)
-                // TODO: Look into why this happen and come up with a proper fix.
+                // The last 2 lines are the request body. We don't need it for parsing the header
                 for (int i = 1; i < lines.Length - 2; i++)
                 {
                     var header = lines[i].Split(":");
                     headers[header[0].ToLower()] = header[1];
                 }
+                
+                // Request body
+                string requestBody = lines[lines.Length - 1];
 
                 string host, userAgent;
                 headers.TryGetValue(HOST, out host);
@@ -90,7 +99,7 @@ class Program
                 }
 
                 string response;
-                if (path == "/")
+                if (path == "/" && method == "GET")
                 {
                     // Check if the request is a GET request and the path is "/"
                     // Includes the HTTP version used by the client 
@@ -102,9 +111,28 @@ class Program
                     switch (splittedPath[1])
                     {
                         case "files":
+                            string filename = splittedPath[2];
+                            // Hacky hacky hack hack
+                            if (method == "POST")
+                            {
+                                try
+                                {
+                                    await using (StreamWriter writer = new StreamWriter($"{directory}/{filename}"))
+                                    {
+                                        await writer.WriteAsync(requestBody);
+                                    }
+                                    await RespondAsync(201, httpVer, stream);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"/files/ Writefile: ${ex.Message}");
+                                    await RespondAsync(500, httpVer, stream);
+                                }
+                                break;
+                            }
                             try
                             {
-                                content = await File.ReadAllTextAsync($"{directory}/{splittedPath[2]}");
+                                content = await File.ReadAllTextAsync($"{directory}/{filename}");
                                 contentType = "application/octet-stream";
                                 await RespondwithFilesAsync(httpVer, stream, content, contentType);
                             }
@@ -176,6 +204,10 @@ class Program
                 response += $"Content-Type: {contentType}\r\n" +
                             $"Content-Length: {contentLength}\r\n\r\n" +
                             $"{content}";
+                break;
+            
+            case 201:
+                response = $"{httpVer} 201 Created\\r\\n\\r\\n\n";
                 break;
             
             case 404:
