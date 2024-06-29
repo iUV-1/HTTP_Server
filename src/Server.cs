@@ -207,7 +207,7 @@ class Program
                 break;
             
             case 201:
-                response = $"{httpVer} 201 Created\\r\\n\\r\\n\n";
+                response = $"{httpVer} 201 Created\r\n\r\n";
                 break;
             
             case 404:
