@@ -23,37 +23,37 @@ class Program
         {
             await using (NetworkStream stream = cilent.GetStream())
             {
-                byte[] responseBuffer = new byte[1024];
+                const int BUFFER_SIZE = 1024;
+                const string HOST = "host";
+                const string USER_AGENT = "user-agent";
+                const string ACCEPT = "accept";
+                
+                Dictionary<string, string> headers = new Dictionary<string, string>();
+                
+                byte[] responseBuffer = new byte[BUFFER_SIZE];
 
                 int bytesRead =
                     await stream.ReadAsync(responseBuffer, 0, responseBuffer.Length); // Receive packets from client
                 var lines = Encoding.UTF8.GetString(responseBuffer)
                     .Split("\r\n"); // Split the package according to CRLF line break
-                // Status line
+                
+                // Status 
                 var line0 = lines[0].Split(" "); // Split the first line of the package by space 
                 var (method, path, httpVer) = (line0[0], line0[1], line0[2]);
 
                 // Headers
                 // Split the headers into appropriate variables. If that properties doesn't exist then it is the default value (empty string)
-                string host = "", userAgent = "", accept = "";
-                for (int i = 1; i < lines.Length; i++)
+                // lines.Length - 2 is a cheap hack because the last 2 lines of what I splitted is nonsense (One is an empty line and the other is a null line?)
+                // TODO: Look into why this happen and come up with a proper fix.
+                for (int i = 1; i < lines.Length - 2; i++)
                 {
                     var header = lines[i].Split(":");
-                    switch (header[0].ToLower())
-                    {
-                        case "host":
-                            host = header[1];
-                            break;
-                        case "user-agent":
-                            userAgent = header[1];
-                            break;
-                        case "accept":
-                            accept = header[1];
-                            break;
-                        default:
-                            break;
-                    }
+                    headers[header[0].ToLower()] = header[1];
                 }
+
+                string host = headers[HOST];
+                string userAgent = headers[USER_AGENT];
+                string accept = "";
 
                 // Split the path
                 var splittedPath = path.Split("/");
@@ -72,40 +72,46 @@ class Program
                 {
                     // Check if the request is a GET request and the path is "/"
                     // Includes the HTTP version used by the client 
-                    response = $"{httpVer} 200 OK\r\n\r\n";
+                    await RespondAsync(status: 200, httpVer: httpVer, stream);
                 }
                 else if (splittedPath.Length >= 2)
                 {
+                    string content, contentType, contentLength;
                     switch (splittedPath[1])
                     {
-                        case "user-agent":
-                            string content = userAgent.Trim();
+                        case "files":
+                            break;
 
-                            string status = $"{httpVer} 200 OK";
-                            string contentType = "Content-Type: text/plain";
-                            string contentLength = $"Content-Length: {content.Length.ToString()}";
-                            response = $"{status}\r\n{contentType}\r\n{contentLength}\r\n\r\n{content}";
+                        case "user-agent":
+                            content = userAgent.Trim();
+                            contentType = "text/plain";
+                            contentLength = content.Length.ToString();
+
+                            await RespondAsync(status: 200, httpVer: httpVer, stream,
+                                                content, contentType, contentLength);
                             break;
 
                         case "echo":
+                            content = splittedPath[2];
+                            contentType = "text/plain";
+                            contentLength = content.Length.ToString();
+                            await RespondAsync(status: 200, httpVer: httpVer, stream,
+                                content, contentType, contentLength);
                             response =
                                 $"{httpVer} 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {splittedPath[2].Length.ToString()}\r\n\r\n{splittedPath[2]}\n";
                             break;
                         default:
                             response = $"{httpVer} 404 Not Found\r\n\r\n";
+                            await RespondAsync(status: 404, httpVer: httpVer, stream);
                             break;
                     }
                 }
                 else
                 {
                     response = $"{httpVer} 404 Not Found\r\n\r\n";
+                    await RespondAsync(status: 404, httpVer: httpVer, stream);
                 }
 
-                Console.WriteLine("//Response");
-                Console.WriteLine(response); // Print the response
-                await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
-
-                Console.WriteLine("Response sent");
             }
         }
         catch (Exception ex)
@@ -119,6 +125,43 @@ class Program
         }
     }
 
-}
+    static async Task RespondAsync(int status, string httpVer, NetworkStream stream,
+        string content = "", string contentType = "", string contentLength = "")
+    {
+        string response;
+        switch (status)
+        {
+            case 200:
+                response = $"{httpVer} 200 OK\r\n";
 
-// Uncomment this block to pass the first stage
+                if (content == "" && contentType == "" && contentLength == "")
+                {
+                    // No headers needed
+                    break;
+                }
+                response += $"Content-Type: {contentType}\r\n" +
+                            $"Content-Length: {contentLength}\r\n\r\n" +
+                            $"{content}";
+                break;
+            
+            case 404:
+                response = $"{httpVer} 404 Not Found\r\n\r\n";
+                break;
+            
+            case 500:
+                response = $"{httpVer} 500 Internal Server Error\r\n\r\n";
+                break;
+            
+            default:
+                response = $"{httpVer} 404 Not Found\r\n\r\n";
+                break;
+        }
+        
+        Console.WriteLine("//Response");
+        Console.WriteLine(response); // Print the response
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+        Console.WriteLine("Response sent");
+    }
+    //static async Task RespondwithFiles(string status, string contentType, )
+}
