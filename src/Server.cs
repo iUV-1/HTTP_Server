@@ -56,12 +56,12 @@ class Program
                 int bytesRead =
                     await stream.ReadAsync(responseBuffer, 0, BUFFER_SIZE); // Receive packets from client
                 
-                int i = responseBuffer.Length - 1;
-                while(responseBuffer[i] == 0)
-                    --i;
+                int idx = responseBuffer.Length - 1;
+                while(responseBuffer[idx] == 0)
+                    --idx;
                 // now foo[i] is the last non-zero byte
-                byte[] strippedBuffer = new byte[i+1];
-                Array.Copy(responseBuffer, strippedBuffer, i+1);
+                byte[] strippedBuffer = new byte[idx+1];
+                Array.Copy(responseBuffer, strippedBuffer, idx+1);
                 /*Console.WriteLine("Response Buffer");
                 Console.WriteLine(Encoding.UTF8.GetString(responseBuffer));*/
                 var lines = Encoding.UTF8.GetString(strippedBuffer)
