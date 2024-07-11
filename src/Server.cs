@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.IO;
+using System.IO.Compression;
 
 class Program
 {
@@ -231,9 +232,11 @@ class Program
 
                 if (encodeWithGzip)
                 {
+                    // Encoding header
                     response += "Content-Encoding: gzip\r\n\r\n";
-                    response += $"{content}";
                     // Encode the response with gzip
+                    response += $"{Encoding.UTF8.GetString(Compress(content))}";
+
                     Console.WriteLine("//Response w/ gzip");
                     Console.WriteLine(response); // Print the response
                     await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
@@ -304,10 +307,10 @@ class Program
                 }
             }
         }
-        response += $"{content}";
         if (encodeWithGzip)
         {
             // Encode the response with gzip
+            response += $"{Encoding.UTF8.GetString(Compress(content))}";
             Console.WriteLine("//Response w/ gzip");
             Console.WriteLine(response); // Print the response
             await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
@@ -316,6 +319,8 @@ class Program
         }
         else
         {
+            response += $"{content}";
+
             Console.WriteLine("//Response");
             Console.WriteLine(response); // Print the response
             await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
@@ -333,5 +338,18 @@ class Program
         byte[] strippedBuffer = new byte[i+1];
         Array.Copy(buffer, strippedBuffer, i+1);
         return strippedBuffer;
+    }
+
+    static byte[] Compress(string data)
+    {
+        byte[] compressed = Encoding.UTF8.GetBytes(data);
+        using (var compressedStream = new MemoryStream())
+        {
+            using (var gzipStream = new GZipStream(compressedStream, CompressionLevel.Optimal))
+            {
+                gzipStream.Write(compressed, 0, compressed.Length);
+            }
+            return compressedStream.ToArray();
+        }
     }
 }
