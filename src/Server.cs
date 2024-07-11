@@ -197,12 +197,12 @@ class Program
     {
         string response;
         bool encodeWithGzip = false;
+        string[] encodings;
         switch (status)
         {
             case 200:
+                // Headers
                 response = $"{httpVer} 200 OK\r\n";
-                
-
                 if (content == "" && contentType == "" && contentLength == "" && acceptEncoding == "")
                 {
                     response += "\r\n";
@@ -212,20 +212,24 @@ class Program
                 
                 response += $"Content-Type: {contentType}\r\n" +
                             $"Content-Length: {contentLength}\r\n";
+
+                // Check for gzip encoding in the header
+                encodings = acceptEncoding.Split(", ");
+
+                foreach (var encoding in encodings)
+                {
+                    if (encoding == "gzip")
+                    {
+                        encodeWithGzip = true;
+                        break;
+                    }
+                }
                 
-                if (acceptEncoding == "gzip")
-                {
-                    response += "Content-Encoding: gzip\r\n\r\n";
-                    encodeWithGzip = true;
-                }
-                else
-                {
-                    response += "\r\n";
-                }
-                response += $"{content}";
 
                 if (encodeWithGzip)
                 {
+                    response += "Content-Encoding: gzip\r\n\r\n";
+                    response += $"{content}";
                     // Encode the response with gzip
                     Console.WriteLine("//Response w/ gzip");
                     Console.WriteLine(response); // Print the response
@@ -235,6 +239,8 @@ class Program
                 }
                 else
                 {
+                    response += "\r\n";
+                    response += $"{content}";
                     Console.WriteLine("//Response");
                     Console.WriteLine(response); // Print the response
                     await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
@@ -273,17 +279,24 @@ class Program
         string content, string contentType = "", string acceptEncoding = "")
     {
         string response;
+        string[] encodings;
         bool encodeWithGzip = false;
         int contentLength = Encoding.UTF8.GetBytes(content).Length;
         response = $"{httpVer} 200 OK\r\n"
                    + $"Content-Type: {contentType}\r\n" +
                    $"Content-Length: {contentLength}\r\n\r\n";
-                    
+        
+        // Check for gzip encoding in the header
+        encodings = acceptEncoding.Split(", ");
 
-        if (acceptEncoding == "gzip")
+        foreach (var encoding in encodings)
         {
-            response += "Content-Encoding: gzip";
-            encodeWithGzip = true;
+            if (encoding == "gzip")
+            {
+                response += "Content-Encoding: gzip\r\n";
+                encodeWithGzip = true;
+                break;
+            }
         }
         response += $"{content}";
 
