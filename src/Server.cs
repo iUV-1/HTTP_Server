@@ -300,9 +300,8 @@ class Program
                     break;
                 }
             }
-            response += $"{content}";
         }
-
+        response += $"{content}";
         if (encodeWithGzip)
         {
             // Encode the response with gzip
