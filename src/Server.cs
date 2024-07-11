@@ -214,17 +214,20 @@ class Program
                             $"Content-Length: {contentLength}\r\n";
 
                 // Check for gzip encoding in the header
-                encodings = acceptEncoding.Split(", ");
-
-                foreach (var encoding in encodings)
+                if (!String.IsNullOrEmpty(acceptEncoding) ) // empty
                 {
-                    if (encoding == "gzip")
+                    // Check for gzip encoding in the header
+                    encodings = acceptEncoding.Split(", ");
+
+                    foreach (var encoding in encodings)
                     {
-                        encodeWithGzip = true;
-                        break;
+                        if (encoding == "gzip")
+                        {
+                            encodeWithGzip = true;
+                            break;
+                        }
                     }
                 }
-                
 
                 if (encodeWithGzip)
                 {
