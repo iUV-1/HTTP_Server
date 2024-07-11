@@ -285,20 +285,23 @@ class Program
         response = $"{httpVer} 200 OK\r\n"
                    + $"Content-Type: {contentType}\r\n" +
                    $"Content-Length: {contentLength}\r\n\r\n";
-        
-        // Check for gzip encoding in the header
-        encodings = acceptEncoding.Split(", ");
 
-        foreach (var encoding in encodings)
+        if (!String.IsNullOrEmpty(acceptEncoding) ) // empty
         {
-            if (encoding == "gzip")
+            // Check for gzip encoding in the header
+            encodings = acceptEncoding.Split(", ");
+
+            foreach (var encoding in encodings)
             {
-                response += "Content-Encoding: gzip\r\n";
-                encodeWithGzip = true;
-                break;
+                if (encoding == "gzip")
+                {
+                    response += "Content-Encoding: gzip\r\n";
+                    encodeWithGzip = true;
+                    break;
+                }
             }
+            response += $"{content}";
         }
-        response += $"{content}";
 
         if (encodeWithGzip)
         {
