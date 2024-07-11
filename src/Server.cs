@@ -49,6 +49,7 @@ class Program
                 const string HOST = "host";
                 const string USER_AGENT = "user-agent";
                 const string ACCEPT = "accept";
+                const string ACCEPT_ENCODING = "accept-encoding";
                 
                 Dictionary<string, string> headers = new Dictionary<string, string>();
                 
@@ -73,19 +74,23 @@ class Program
                 // Headers
                 // Split the headers and put them in a dictionary.
                 // The last 2 lines are the request body. We don't need it for parsing the header
+                Console.WriteLine("//Headers");
                 for (int i = 1; i < lines.Length - 2; i++)
                 {
                     var header = lines[i].Split(":");
+                    header[1] = header[1].TrimStart();
+                    Console.WriteLine($"{header[0].ToLower()}:{header[1]}");
                     headers[header[0].ToLower()] = header[1];
                 }
                 
                 // Getting the value into appropriate vars
                 // If it doesn't exist then don't throw a fuzz, just leave it empty
                 // spoopy
-                string host, userAgent, accept;
+                string host, userAgent, accept, acceptEncoding;
                 headers.TryGetValue(HOST, out host);
                 headers.TryGetValue(USER_AGENT, out userAgent);
                 headers.TryGetValue(ACCEPT, out accept);
+                headers.TryGetValue(ACCEPT_ENCODING, out acceptEncoding);
                 
                 // Request body
                 string requestBody = lines[lines.Length - 1];
@@ -139,7 +144,7 @@ class Program
                             {
                                 content = await File.ReadAllTextAsync($"{directory}/{filename}");
                                 contentType = "application/octet-stream";
-                                await RespondwithFilesAsync(httpVer, stream, content, contentType);
+                                await RespondwithFilesAsync(httpVer, stream, content, contentType, acceptEncoding: acceptEncoding);
                             }
                             catch (IOException ex)
                             {
@@ -154,7 +159,7 @@ class Program
                             contentLength = content.Length.ToString();
 
                             await RespondAsync(status: 200, httpVer: httpVer, stream,
-                                                content, contentType, contentLength);
+                                                content, contentType, contentLength, acceptEncoding: acceptEncoding);
                             break;
 
                         case "echo":
@@ -162,7 +167,7 @@ class Program
                             contentType = "text/plain";
                             contentLength = content.Length.ToString();
                             await RespondAsync(status: 200, httpVer: httpVer, stream,
-                                content, contentType, contentLength);
+                                content, contentType, contentLength, acceptEncoding: acceptEncoding);
                             break;
                         default:
                             await RespondAsync(status: 404, httpVer: httpVer, stream);
@@ -188,23 +193,54 @@ class Program
     }
 
     static async Task RespondAsync(int status, string httpVer, NetworkStream stream,
-        string content = "", string contentType = "", string contentLength = "")
+        string content = "", string contentType = "", string contentLength = "", string acceptEncoding = "")
     {
         string response;
+        bool encodeWithGzip = false;
         switch (status)
         {
             case 200:
                 response = $"{httpVer} 200 OK\r\n";
+                
 
-                if (content == "" && contentType == "" && contentLength == "")
+                if (content == "" && contentType == "" && contentLength == "" && acceptEncoding == "")
                 {
                     response += "\r\n";
                     // No headers needed
                     break;
                 }
+                
                 response += $"Content-Type: {contentType}\r\n" +
-                            $"Content-Length: {contentLength}\r\n\r\n" +
-                            $"{content}";
+                            $"Content-Length: {contentLength}\r\n";
+                
+                if (acceptEncoding == "gzip")
+                {
+                    response += "Content-Encoding: gzip\r\n\r\n";
+                    encodeWithGzip = true;
+                }
+                else
+                {
+                    response += "\r\n";
+                }
+                response += $"{content}";
+
+                if (encodeWithGzip)
+                {
+                    // Encode the response with gzip
+                    Console.WriteLine("//Response w/ gzip");
+                    Console.WriteLine(response); // Print the response
+                    await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+                    Console.WriteLine("Response sent");
+                }
+                else
+                {
+                    Console.WriteLine("//Response");
+                    Console.WriteLine(response); // Print the response
+                    await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+                    Console.WriteLine("Response sent");
+                }
                 break;
             
             case 201:
@@ -234,20 +270,40 @@ class Program
     // IMPORTANT: This function assume that the response is successful and will return a 200 response
     // If it's an error, please use RespondAsync() instead.
     static async Task RespondwithFilesAsync( string httpVer, NetworkStream stream,
-        string content, string contentType = "")
+        string content, string contentType = "", string acceptEncoding = "")
     {
         string response;
+        bool encodeWithGzip = false;
         int contentLength = Encoding.UTF8.GetBytes(content).Length;
         response = $"{httpVer} 200 OK\r\n"
-                    + $"Content-Type: {contentType}\r\n" +
-                    $"Content-Length: {contentLength}\r\n\r\n" +
-                    $"{content}";
-        
-        Console.WriteLine("//Response");
-        Console.WriteLine(response); // Print the response
-        await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+                   + $"Content-Type: {contentType}\r\n" +
+                   $"Content-Length: {contentLength}\r\n\r\n";
+                    
 
-        Console.WriteLine("Response sent");
+        if (acceptEncoding == "gzip")
+        {
+            response += "Content-Encoding: gzip";
+            encodeWithGzip = true;
+        }
+        response += $"{content}";
+
+        if (encodeWithGzip)
+        {
+            // Encode the response with gzip
+            Console.WriteLine("//Response w/ gzip");
+            Console.WriteLine(response); // Print the response
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+            Console.WriteLine("Response sent");
+        }
+        else
+        {
+            Console.WriteLine("//Response");
+            Console.WriteLine(response); // Print the response
+            await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+            Console.WriteLine("Response sent");
+        }
     }
 
     // Strip NULL bytes out of a byte array
