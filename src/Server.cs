@@ -157,18 +157,16 @@ class Program
                         case "user-agent":
                             content = userAgent.Trim();
                             contentType = "text/plain";
-                            contentLength = content.Length.ToString();
 
                             await RespondAsync(status: 200, httpVer: httpVer, stream,
-                                                content, contentType, contentLength, acceptEncoding: acceptEncoding);
+                                                content, contentType, acceptEncoding: acceptEncoding);
                             break;
 
                         case "echo":
                             content = splittedPath[2];
                             contentType = "text/plain";
-                            contentLength = content.Length.ToString();
                             await RespondAsync(status: 200, httpVer: httpVer, stream,
-                                content, contentType, contentLength, acceptEncoding: acceptEncoding);
+                                content, contentType, acceptEncoding: acceptEncoding);
                             break;
                         default:
                             await RespondAsync(status: 404, httpVer: httpVer, stream);
@@ -211,8 +209,8 @@ class Program
                     break;
                 }
                 
-                response += $"Content-Type: {contentType}\r\n" +
-                            $"Content-Length: {contentLength}\r\n";
+                response += $"Content-Type: {contentType}\r\n";
+                
 
                 // Check for gzip encoding in the header
                 if (!String.IsNullOrEmpty(acceptEncoding) ) // empty
@@ -232,10 +230,13 @@ class Program
 
                 if (encodeWithGzip)
                 {
+                    // Encode the response with gzip
+                    var compressedContent = Encoding.UTF8.GetString(Compress(content));
+                    response += $"Content-Length: {compressedContent.Length}\r\n";
                     // Encoding header
                     response += "Content-Encoding: gzip\r\n\r\n";
-                    // Encode the response with gzip
-                    response += $"{Encoding.UTF8.GetString(Compress(content))}";
+                    
+                    response += $"{compressedContent}";
 
                     Console.WriteLine("//Response w/ gzip");
                     Console.WriteLine(response); // Print the response
@@ -245,6 +246,7 @@ class Program
                 }
                 else
                 {
+                    response += $"Content-Length: {content.Length}\r\n";
                     response += "\r\n";
                     response += $"{content}";
                     Console.WriteLine("//Response");
@@ -287,10 +289,8 @@ class Program
         string response;
         string[] encodings;
         bool encodeWithGzip = false;
-        int contentLength = Encoding.UTF8.GetBytes(content).Length;
         response = $"{httpVer} 200 OK\r\n"
-                   + $"Content-Type: {contentType}\r\n" +
-                   $"Content-Length: {contentLength}\r\n\r\n";
+                   + $"Content-Type: {contentType}\r\n";
 
         if (!String.IsNullOrEmpty(acceptEncoding) ) // empty
         {
@@ -310,7 +310,10 @@ class Program
         if (encodeWithGzip)
         {
             // Encode the response with gzip
-            response += $"{Encoding.UTF8.GetString(Compress(content))}";
+            var compressedContent = Encoding.UTF8.GetString(Compress(content));
+            int contentLength = compressedContent.Length;
+            response += $"Content-Length: {contentLength}\r\n\r\n";
+            response += $"{compressedContent}";
             Console.WriteLine("//Response w/ gzip");
             Console.WriteLine(response); // Print the response
             await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
@@ -319,6 +322,8 @@ class Program
         }
         else
         {
+            int contentLength = Encoding.UTF8.GetBytes(content).Length;
+            response += $"Content-Length: {contentLength}\r\n\r\n";
             response += $"{content}";
 
             Console.WriteLine("//Response");
