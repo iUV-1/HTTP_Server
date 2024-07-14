@@ -231,17 +231,14 @@ class Program
                 if (encodeWithGzip)
                 {
                     // Encode the response with gzip
-                    var compressedContent = Encoding.UTF8.GetString(Compress(content));
+                    var compressedContent = Compress(content);
                     response += $"Content-Length: {compressedContent.Length}\r\n";
                     // Encoding header
                     response += "Content-Encoding: gzip\r\n\r\n";
-                    
-                    response += $"{compressedContent}";
-
+                    var responseBytes = AppendResponse(response, compressedContent);
                     Console.WriteLine("//Response w/ gzip");
-                    Console.WriteLine(response); // Print the response
-                    await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
-
+                    Console.WriteLine(Encoding.UTF8.GetString(responseBytes)); // Print the response
+                    await stream.WriteAsync(responseBytes); // Serialize the response and send it.
                     Console.WriteLine("Response sent");
                 }
                 else
@@ -310,14 +307,17 @@ class Program
         if (encodeWithGzip)
         {
             // Encode the response with gzip
-            var compressedContent = Encoding.UTF8.GetString(Compress(content));
+            var compressedContent = Compress(content);
             int contentLength = compressedContent.Length;
             response += $"Content-Length: {contentLength}\r\n\r\n";
-            response += $"{compressedContent}";
-            Console.WriteLine("//Response w/ gzip");
-            Console.WriteLine(response); // Print the response
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+            
+            var responseBytes = AppendResponse(response, compressedContent);
 
+            Console.WriteLine("//Response w/ gzip");
+            Console.WriteLine(Encoding.UTF8.GetString(responseBytes)); 
+            Console.WriteLine("//Decompressed content");
+            Console.WriteLine(Encoding.UTF8.GetString(compressedContent));
+            await stream.WriteAsync(responseBytes); // Serialize the response and send it.
             Console.WriteLine("Response sent");
         }
         else
@@ -356,5 +356,29 @@ class Program
             }
             return compressedStream.ToArray();
         }
+    }
+
+    static byte[] Decompress(string data)
+    {
+        byte[] i = Encoding.UTF8.GetBytes(data);
+        
+        using (var resultStream = new MemoryStream())
+        {
+            using (var gzipStream = new GZipStream(new MemoryStream(i), CompressionMode.Decompress))
+            {
+                gzipStream.CopyTo(resultStream);
+                return resultStream.ToArray();
+            }
+        }
+    }
+
+    static byte[] AppendResponse(string header, byte[] response)
+    {
+        byte[] encodedHeader = Encoding.UTF8.GetBytes(header);
+        byte[] encodedResponse = new byte[encodedHeader.Length + response.Length];
+        Buffer.BlockCopy(encodedHeader, 0, encodedResponse, 0, header.Length);
+        Buffer.BlockCopy(response, 0, encodedResponse, encodedHeader.Length, response.Length);
+
+        return encodedResponse;
     }
 }
