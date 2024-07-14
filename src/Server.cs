@@ -216,26 +216,14 @@ class Program
 
                 if (encodeWithGzip)
                 {
-                    /*// Encode the response with gzip
-                    var compressedContent = Compress(content);
-                    // Headers
-                    response += $"Content-Length: {compressedContent.Length}\r\n";
-                    response += "Content-Encoding: gzip\r\n\r\n";
-                    // response in this case is the headers.
-                    var responseBytes = AppendResponse(response, compressedContent);
-                    
-                    Console.WriteLine("//Response w/ gzip");
-                    Console.WriteLine(Encoding.UTF8.GetString(responseBytes)); 
-                    await stream.WriteAsync(responseBytes); // Send the response.
-                    Console.WriteLine("Response sent");*/
                     await EncodeWithGzipAsync(content, response, stream);
+                    return;
                 }
-                else
-                {
-                    response += $"Content-Length: {content.Length}\r\n";
-                    response += "\r\n";
-                    response += $"{content}";
-                }
+                
+                response += $"Content-Length: {content.Length}\r\n";
+                response += "\r\n";
+                response += $"{content}";
+                
                 break;
             
             case 201:
@@ -272,43 +260,26 @@ class Program
         string content, string contentType = "", string acceptEncoding = "")
     {
         string response;
-        bool encodeWithGzip = false;
         
         response = $"{httpVer} 200 OK\r\n"
                    + $"Content-Type: {contentType}\r\n";
         
-        encodeWithGzip = CheckForEncoding(acceptEncoding);
-        if (encodeWithGzip)
+        if (CheckForEncoding(acceptEncoding))
         {
-            /*// Encode the response with gzip
-            var compressedContent = Compress(content);
-            
-            // Header
-            response += "Content-Encoding: gzip\r\n";
-            response += $"Content-Length: {compressedContent.Length}\r\n\r\n";
-            
-            var responseBytes = AppendResponse(response, compressedContent);
-
-            Console.WriteLine("//Response w/ gzip");
-            Console.WriteLine(Encoding.UTF8.GetString(responseBytes)); 
-            
-            await stream.WriteAsync(responseBytes); // Send the response.
-            Console.WriteLine("Response sent");*/
-
             await EncodeWithGzipAsync(content, response, stream);
+            return;
         }
-        else
-        {
-            int contentLength = Encoding.UTF8.GetBytes(content).Length;
-            response += $"Content-Length: {contentLength}\r\n\r\n";
-            response += $"{content}";
 
-            Console.WriteLine("//Response");
-            Console.WriteLine(response); // Print the response
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+        int contentLength = Encoding.UTF8.GetBytes(content).Length;
+        response += $"Content-Length: {contentLength}\r\n\r\n";
+        response += $"{content}";
 
-            Console.WriteLine("Response sent");
-        }
+        Console.WriteLine("//Response");
+        Console.WriteLine(response); // Print the response
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(response)); // Serialize the response and send it.
+
+        Console.WriteLine("Response sent");
+        
     }
 
     // Strip NULL bytes out of a byte array
@@ -378,5 +349,4 @@ class Program
         await stream.WriteAsync(responseBytes); // Send the response.
         Console.WriteLine("Response sent");
     }
-    
 }
