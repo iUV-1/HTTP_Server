@@ -10,17 +10,27 @@ class Program
     static async Task Main(string[] args)
     {
         string directory = string.Empty;
-        // Parse directory from argument 
+        string portStr = string.Empty;
+        int port = 4221;
+        // Parse arguments
         for (int i = 0; i < args.Length; i++)
         {
             if ((args[i] == "-d" || args[i] == "--directory") && i + 1 < args.Length)
             {
                 directory = args[i + 1];
-                break;
             }
+            if ((args[i] == "-p" || args[i] == "--port") && i + 1 < args.Length) {
+                portStr = args[i+1];
+            }
+            
         }
-
-        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+        // Configure directory
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(@directory);
+            Console.WriteLine($"Main: Created and working with directory: {directory}");
+        }
+        else if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
         {
             Console.WriteLine($"Main: Working with directory: {directory}");
         }
@@ -28,10 +38,36 @@ class Program
         {
             Console.WriteLine("Main: Directory not specified, using the base folder");
         }
+
+        // Configure port
+        if (!string.IsNullOrEmpty(portStr)) {
+            try {
+                port = Convert.ToInt32(portStr);
+                if (port == 0) {
+                    Console.WriteLine($"Main: The program will automatically use the most appropriate port.");
+                }
+                else if (port < 1) {
+                    Console.WriteLine($"Main: Invalid port number, using default port (4221)");
+                    port = 4221;
+                } else {
+                    Console.WriteLine($"Main: Using port: {portStr}");
+                }
+            } 
+            catch {
+                Console.WriteLine($"Main: Port number conversion failed, using default port (4221)");
+                port = 4221;
+            }
+        } else {
+            Console.WriteLine($"Main: Port number not specified, using default port (4221)");
+        }
         
-        TcpListener server = new TcpListener(IPAddress.Any, 4221);
+        TcpListener server = new TcpListener(IPAddress.Any, port);
+
         server.Start();
         // Constantly waits for a new cilent 
+        Console.WriteLine($"Main: I am listening for connections on " +
+            IPAddress.Parse(((IPEndPoint)server.LocalEndpoint).Address.ToString()) + 
+            " on port number " + ((IPEndPoint)server.LocalEndpoint).Port.ToString());
         while (true)
         {
             var cilent = await server.AcceptTcpClientAsync();
