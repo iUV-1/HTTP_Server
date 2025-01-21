@@ -1,0 +1,11 @@
+﻿services:
+  codecrafters-http-server:
+    image: codecrafters-http-server
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: codecrafters-http-server
+    ports:
+    - "4221:4221"
+    volumes:
+      - /home/http-server:/app/data
